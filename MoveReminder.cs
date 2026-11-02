@@ -21,7 +21,7 @@ class MoveReminder : Form {
                 using(var image=new Bitmap(320,280)){controller.popup.BackColor=Color.White;controller.popup.DrawToBitmap(image,new Rectangle(0,0,320,280));using(var g=Graphics.FromImage(image))using(var art=controller.popup.alphaArtwork.RenderBitmap(controller.popup.TimerValue))g.DrawImageUnscaled(art,0,0);image.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"startup-preview.png"));}
                 controller.popup.ClientSize=new Size(500,500);if(Math.Abs(controller.popup.Height-controller.popup.Width*280.0/320.0)>1)throw new Exception("Aspect ratio failed");
                 controller.popup.HideToTray();if(controller.popup.Visible||controller.popup.alphaArtwork.Visible||!controller.tray.Visible||!controller.timer.Enabled)throw new Exception("Tray minimize failed");controller.BecomeDue();if(!controller.popup.Visible||!controller.popup.alphaArtwork.Visible)throw new Exception("Due restore failed");controller.Restart();
-                controller.popup.ClientSize=new Size(480,675);if(controller.popup.Region==null)throw new Exception("Resize shape missing");controller.popup.ClientSize=new Size(320,280);controller.BecomeDue();controller.ToggleExercise();if(!controller.exercise)throw new Exception("Pause failed");controller.ToggleExercise();if(controller.exercise||controller.popup.IsDisposed)throw new Exception("Restart failed");
+                controller.popup.ClientSize=new Size(480,675);if(controller.popup.Region==null)throw new Exception("Resize shape missing");controller.popup.ClientSize=new Size(320,280);controller.BecomeDue();if(!controller.popup.MotionActive)throw new Exception("Reminder animation missing");controller.ToggleExercise();if(controller.popup.MotionActive)throw new Exception("Animation did not stop");if(!controller.exercise)throw new Exception("Pause failed");controller.ToggleExercise();if(controller.exercise||controller.popup.IsDisposed)throw new Exception("Restart failed");
                 controller.ExitApp();if(controller.timer.Enabled||!controller.popup.IsDisposed)throw new Exception("Exit failed");return;
             }
             try{Application.Run(controller.popup);}finally{controller.timer.Stop();controller.timer.Dispose();}
@@ -56,7 +56,7 @@ class MoveReminder : Form {
         }
     }
     class Reminder:Form{
-        readonly Timer pulse=new Timer();readonly Button button=new Button();        readonly Image artwork;public AlphaArtwork alphaArtwork;bool exercising=false,bright=false;public string TimerValue="30:00";bool isDue=false;bool layoutReady=false;readonly System.Collections.Generic.Dictionary<Control,Font> scaledFonts=new System.Collections.Generic.Dictionary<Control,Font>();
+        readonly Timer pulse=new Timer();readonly Button button=new Button();        readonly Image artwork;public AlphaArtwork alphaArtwork;bool exercising=false;Point restPosition;bool animationMove=false;readonly System.Diagnostics.Stopwatch animationClock=new System.Diagnostics.Stopwatch();public string TimerValue="30:00";bool isDue=false;bool layoutReady=false;readonly System.Collections.Generic.Dictionary<Control,Font> scaledFonts=new System.Collections.Generic.Dictionary<Control,Font>();
         public Reminder(Action toggle,Action exit,Action settingsAction){
             Text="动一下 · 西瓜提醒";ClientSize=new Size(320,280);MinimumSize=new Size(280,245);MaximumSize=new Size(640,560);
             FormBorderStyle=FormBorderStyle.None;TopMost=true;ShowInTaskbar=false;DoubleBuffered=true;
@@ -69,10 +69,15 @@ class MoveReminder : Form {
             var minimize=new Button{Text="收起",FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(255,139,135)};minimize.FlatAppearance.BorderSize=0;minimize.Name="minimize";minimize.SetBounds(112,150,48,25);minimize.AccessibleName="最小化到系统托盘";minimize.Click+=(s,e)=>HideToTray();Controls.Add(minimize);
             foreach(Control control in Controls)control.Tag=control.Bounds;
             layoutReady=true;Resize+=(s,e)=>Relayout();Relayout();
-            Shown+=(s,e)=>{Position();alphaArtwork=new AlphaArtwork(this,artwork);alphaArtwork.Show(this);alphaArtwork.RefreshSurface(TimerValue);};LocationChanged+=(s,e)=>{if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);};pulse.Interval=850;pulse.Tick+=(s,e)=>{bright=!bright;button.BackColor=bright?Color.FromArgb(76,166,99):Color.FromArgb(48,123,76);if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);Invalidate();};FormClosed+=(s,e)=>{pulse.Dispose();if(alphaArtwork!=null)alphaArtwork.Close();artwork.Dispose();foreach(var font in scaledFonts.Values)font.Dispose();};RefreshState(false);
+            Shown+=(s,e)=>{Position();alphaArtwork=new AlphaArtwork(this,artwork);alphaArtwork.Show(this);alphaArtwork.RefreshSurface(TimerValue);};LocationChanged+=(s,e)=>{if(!animationMove)restPosition=Location;if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);};pulse.Interval=40;pulse.Tick+=(s,e)=>{
+                if(!Visible||!Enabled)return;double phase=animationClock.Elapsed.TotalSeconds*2*Math.PI/1.8;
+                float glow=(float)((1-Math.Cos(phase))/2);if(alphaArtwork!=null)alphaArtwork.Glow=glow;
+                int offset=(int)Math.Round(6*(ClientSize.Width/320f)*glow);animationMove=true;Location=new Point(restPosition.X,restPosition.Y-offset);animationMove=false;
+                if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);
+            };FormClosed+=(s,e)=>{pulse.Dispose();if(alphaArtwork!=null)alphaArtwork.Close();artwork.Dispose();foreach(var font in scaledFonts.Values)font.Dispose();};RefreshState(false);
             MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(Handle,0xA1,(IntPtr)2,IntPtr.Zero);}};
         }
-        public void HideToTray(){if(alphaArtwork!=null)alphaArtwork.Hide();Hide();}
+        public void HideToTray(){StopMotion();if(alphaArtwork!=null)alphaArtwork.Hide();Hide();}
         public void RestoreFromTray(){Show();WindowState=FormWindowState.Normal;if(alphaArtwork!=null){if(!alphaArtwork.Visible)alphaArtwork.Show();alphaArtwork.RefreshSurface(TimerValue);}Activate();}
         protected override void SetBoundsCore(int x,int y,int width,int height,BoundsSpecified specified){
             if(layoutReady&&(specified&BoundsSpecified.Size)!=0){
@@ -107,8 +112,11 @@ class MoveReminder : Form {
         [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool ReleaseCapture();
         [System.Runtime.InteropServices.DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr h,int m,IntPtr w,IntPtr l);
         void Position(){var area=Screen.FromPoint(Cursor.Position).WorkingArea;Location=new Point(area.Right-Width-12,area.Bottom-Height-12);}
-        public void UpdateTimer(string value,bool due,bool active){bool changed=TimerValue!=value;TimerValue=value;if(changed&&alphaArtwork!=null)alphaArtwork.RefreshSurface(value);isDue=due;if(due&&!active)pulse.Start();else pulse.Stop();Invalidate();}
-        public void RefreshState(bool active){exercising=active;button.AccessibleName=active?"运动结束，重新计时":"暂停提醒，去运动";button.Text=active?"运动结束，重新计时":"暂停提醒，去运动";if(active)pulse.Stop();else pulse.Start();if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);Invalidate();}
+        void StartMotion(){if(pulse.Enabled)return;restPosition=Location;animationClock.Restart();pulse.Start();}
+        void StopMotion(){if(!pulse.Enabled)return;pulse.Stop();animationClock.Reset();animationMove=true;Location=restPosition;animationMove=false;if(alphaArtwork!=null){alphaArtwork.Glow=0;alphaArtwork.RefreshSurface(TimerValue);}}
+        public bool MotionActive{get{return pulse.Enabled;}}
+        public void UpdateTimer(string value,bool due,bool active){bool changed=TimerValue!=value;TimerValue=value;if(changed&&alphaArtwork!=null)alphaArtwork.RefreshSurface(value);isDue=due;if(due&&!active)StartMotion();else StopMotion();Invalidate();}
+        public void RefreshState(bool active){exercising=active;button.AccessibleName=active?"运动结束，重新计时":"暂停提醒，去运动";button.Text=active?"运动结束，重新计时":"暂停提醒，去运动";if(active)StopMotion();if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);Invalidate();}
         protected override bool ShowWithoutActivation{get{return true;}}
         public void ClickAt(Point point){foreach(Control control in Controls)if(control.Bounds.Contains(point)){var check=control as CheckBox;if(check!=null)check.Checked=!check.Checked;else{var buttonControl=control as Button;if(buttonControl!=null)buttonControl.PerformClick();}if(alphaArtwork!=null&&!alphaArtwork.IsDisposed)alphaArtwork.RefreshSurface(TimerValue);return;}}
         public void PaintControls(Graphics g){foreach(Control control in Controls){using(var image=new Bitmap(control.Width,control.Height)){control.DrawToBitmap(image,new Rectangle(Point.Empty,control.Size));g.DrawImage(image,control.Bounds);}}}
