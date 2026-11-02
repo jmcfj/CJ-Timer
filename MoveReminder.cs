@@ -70,9 +70,9 @@ class MoveReminder : Form {
             foreach(Control control in Controls)control.Tag=control.Bounds;
             layoutReady=true;Resize+=(s,e)=>Relayout();Relayout();
             Shown+=(s,e)=>{Position();alphaArtwork=new AlphaArtwork(this,artwork);alphaArtwork.Show(this);alphaArtwork.RefreshSurface(TimerValue);};LocationChanged+=(s,e)=>{if(!animationMove)restPosition=Location;if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);};pulse.Interval=40;pulse.Tick+=(s,e)=>{
-                if(!Visible||!Enabled)return;double phase=animationClock.Elapsed.TotalSeconds*2*Math.PI/1.8;
-                float glow=(float)((1-Math.Cos(phase))/2);if(alphaArtwork!=null)alphaArtwork.Glow=glow;
-                int offset=(int)Math.Round(6*(ClientSize.Width/320f)*glow);animationMove=true;Location=new Point(restPosition.X,restPosition.Y-offset);animationMove=false;
+                if(!Visible||!Enabled)return;Point offset=ShakeOffset(animationClock.Elapsed.TotalSeconds,ClientSize.Width/320f);
+                if(alphaArtwork!=null)alphaArtwork.Glow=offset.X==0?0.25f:0.9f;
+                animationMove=true;Location=new Point(restPosition.X+offset.X,restPosition.Y+offset.Y);animationMove=false;
                 if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);
             };FormClosed+=(s,e)=>{pulse.Dispose();if(alphaArtwork!=null)alphaArtwork.Close();artwork.Dispose();foreach(var font in scaledFonts.Values)font.Dispose();};RefreshState(false);
             MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(Handle,0xA1,(IntPtr)2,IntPtr.Zero);}};
@@ -112,6 +112,12 @@ class MoveReminder : Form {
         [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool ReleaseCapture();
         [System.Runtime.InteropServices.DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr h,int m,IntPtr w,IntPtr l);
         void Position(){var area=Screen.FromPoint(Cursor.Position).WorkingArea;Location=new Point(area.Right-Width-12,area.Bottom-Height-12);}
+        public static Point ShakeOffset(double seconds,float scale){
+            double t=seconds%2.4;
+            if(t>=0.8)return Point.Empty;
+            double envelope=Math.Sin(Math.PI*t/0.8);
+            return new Point((int)Math.Round(10*scale*envelope*Math.Sin(2*Math.PI*6.25*t)),(int)Math.Round(2*scale*envelope*Math.Sin(2*Math.PI*12.5*t)));
+        }
         void StartMotion(){if(pulse.Enabled)return;restPosition=Location;animationClock.Restart();pulse.Start();}
         void StopMotion(){if(!pulse.Enabled)return;pulse.Stop();animationClock.Reset();animationMove=true;Location=restPosition;animationMove=false;if(alphaArtwork!=null){alphaArtwork.Glow=0;alphaArtwork.RefreshSurface(TimerValue);}}
         public bool MotionActive{get{return pulse.Enabled;}}
