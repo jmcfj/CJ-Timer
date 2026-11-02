@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
@@ -62,11 +62,11 @@ class MoveReminder : Form {
             FormBorderStyle=FormBorderStyle.None;TopMost=true;ShowInTaskbar=false;DoubleBuffered=true;
             BackColor=Color.FromArgb(75,42,32);Font=new Font("Microsoft YaHei UI",10);AutoScaleMode=AutoScaleMode.None;
             using(var stream=Assembly.GetExecutingAssembly().GetManifestResourceStream("melon.png"))using(var source=Image.FromStream(stream))artwork=new Bitmap(source);
-            button.SetBounds(78,220,164,26);Style(button);button.BackColor=Color.FromArgb(48,123,76);button.Font=new Font(Font.FontFamily,10,FontStyle.Bold);button.Click+=(s,e)=>toggle();Controls.Add(button);
-            var pin=new CheckBox{Text="固定",Checked=true,Appearance=Appearance.Button,TextAlign=ContentAlignment.MiddleCenter,BackColor=Color.FromArgb(255,139,135)};pin.FlatStyle=FlatStyle.Flat;pin.FlatAppearance.BorderSize=0;pin.SetBounds(62,150,48,25);pin.CheckedChanged+=(s,e)=>TopMost=pin.Checked;Controls.Add(pin);
-            var close=new Button{Text="×",BackColor=Color.FromArgb(255,139,135),FlatStyle=FlatStyle.Flat};close.FlatAppearance.BorderSize=0;close.SetBounds(212,150,36,25);close.AccessibleName="关闭并退出提醒器";close.Click+=(s,e)=>exit();Controls.Add(close);
-            var settingsButton=new Button{Text="设置",FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(255,139,135)};settingsButton.FlatAppearance.BorderSize=0;settingsButton.SetBounds(162,150,48,25);settingsButton.Click+=(s,e)=>settingsAction();Controls.Add(settingsButton);
-            var minimize=new Button{Text="收起",FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(255,139,135)};minimize.FlatAppearance.BorderSize=0;minimize.SetBounds(112,150,48,25);minimize.AccessibleName="最小化到系统托盘";minimize.Click+=(s,e)=>HideToTray();Controls.Add(minimize);
+            button.Name="action";button.AccessibleName="暂停提醒，去运动";button.SetBounds(137,217,46,32);Style(button);button.BackColor=Color.FromArgb(48,123,76);button.Font=new Font(Font.FontFamily,10,FontStyle.Bold);button.Click+=(s,e)=>toggle();Controls.Add(button);
+            var pin=new CheckBox{Text="固定",Checked=true,Appearance=Appearance.Button,TextAlign=ContentAlignment.MiddleCenter,BackColor=Color.FromArgb(255,139,135)};pin.FlatStyle=FlatStyle.Flat;pin.FlatAppearance.BorderSize=0;pin.Name="pin";pin.SetBounds(62,150,48,25);pin.CheckedChanged+=(s,e)=>TopMost=pin.Checked;Controls.Add(pin);
+            var close=new Button{Text="×",BackColor=Color.FromArgb(255,139,135),FlatStyle=FlatStyle.Flat};close.FlatAppearance.BorderSize=0;close.Name="close";close.SetBounds(212,150,36,25);close.AccessibleName="关闭并退出提醒器";close.Click+=(s,e)=>exit();Controls.Add(close);
+            var settingsButton=new Button{Text="设置",FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(255,139,135)};settingsButton.FlatAppearance.BorderSize=0;settingsButton.Name="settings";settingsButton.SetBounds(162,150,48,25);settingsButton.Click+=(s,e)=>settingsAction();Controls.Add(settingsButton);
+            var minimize=new Button{Text="收起",FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(255,139,135)};minimize.FlatAppearance.BorderSize=0;minimize.Name="minimize";minimize.SetBounds(112,150,48,25);minimize.AccessibleName="最小化到系统托盘";minimize.Click+=(s,e)=>HideToTray();Controls.Add(minimize);
             foreach(Control control in Controls)control.Tag=control.Bounds;
             layoutReady=true;Resize+=(s,e)=>Relayout();Relayout();
             Shown+=(s,e)=>{Position();alphaArtwork=new AlphaArtwork(this,artwork);alphaArtwork.Show(this);alphaArtwork.RefreshSurface(TimerValue);};LocationChanged+=(s,e)=>{if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);};pulse.Interval=850;pulse.Tick+=(s,e)=>{bright=!bright;button.BackColor=bright?Color.FromArgb(76,166,99):Color.FromArgb(48,123,76);if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);Invalidate();};FormClosed+=(s,e)=>{pulse.Dispose();if(alphaArtwork!=null)alphaArtwork.Close();artwork.Dispose();foreach(var font in scaledFonts.Values)font.Dispose();};RefreshState(false);
@@ -108,7 +108,7 @@ class MoveReminder : Form {
         [System.Runtime.InteropServices.DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr h,int m,IntPtr w,IntPtr l);
         void Position(){var area=Screen.FromPoint(Cursor.Position).WorkingArea;Location=new Point(area.Right-Width-12,area.Bottom-Height-12);}
         public void UpdateTimer(string value,bool due,bool active){bool changed=TimerValue!=value;TimerValue=value;if(changed&&alphaArtwork!=null)alphaArtwork.RefreshSurface(value);isDue=due;if(due&&!active)pulse.Start();else pulse.Stop();Invalidate();}
-        public void RefreshState(bool active){exercising=active;button.Text=active?"运动结束，重新计时":"暂停提醒，去运动";if(active)pulse.Stop();else pulse.Start();if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);Invalidate();}
+        public void RefreshState(bool active){exercising=active;button.AccessibleName=active?"运动结束，重新计时":"暂停提醒，去运动";button.Text=active?"运动结束，重新计时":"暂停提醒，去运动";if(active)pulse.Stop();else pulse.Start();if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);Invalidate();}
         protected override bool ShowWithoutActivation{get{return true;}}
         public void ClickAt(Point point){foreach(Control control in Controls)if(control.Bounds.Contains(point)){var check=control as CheckBox;if(check!=null)check.Checked=!check.Checked;else{var buttonControl=control as Button;if(buttonControl!=null)buttonControl.PerformClick();}if(alphaArtwork!=null&&!alphaArtwork.IsDisposed)alphaArtwork.RefreshSurface(TimerValue);return;}}
         public void PaintControls(Graphics g){foreach(Control control in Controls){using(var image=new Bitmap(control.Width,control.Height)){control.DrawToBitmap(image,new Rectangle(Point.Empty,control.Size));g.DrawImage(image,control.Bounds);}}}
