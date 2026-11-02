@@ -105,7 +105,7 @@ class MoveReminder : Form {
         protected override bool ShowWithoutActivation{get{return true;}}
         protected override void OnPaint(PaintEventArgs e){
             base.OnPaint(e);var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;g.InterpolationMode=InterpolationMode.HighQualityBicubic;
-            g.DrawImage(artwork,new Rectangle(0,0,320,280));
+            g.DrawImage(artwork,new Rectangle(20,0,280,280));
             using(var brush=new SolidBrush(Color.FromArgb(255,249,236)))g.FillRoundedRectangle(brush,new Rectangle(17,269,286,127),18);
             using(var pen=new Pen(!exercising&&bright?Color.FromArgb(88,170,101):Color.FromArgb(221,230,202),3))g.DrawRoundedRectangle(pen,new Rectangle(17,269,286,127),18);
             using(var font=new Font("Segoe UI",27,FontStyle.Bold))TextRenderer.DrawText(g,exercising?"休息中":"00:00",font,new Rectangle(55,178,210,50),Color.FromArgb(74,42,40),TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.NoPadding);
@@ -117,5 +117,6 @@ static class RoundedDrawing{
     public static void FillRoundedRectangle(this Graphics g,Brush b,Rectangle r,int radius){using(var p=Path(r,radius))g.FillPath(b,p);}
     public static void DrawRoundedRectangle(this Graphics g,Pen b,Rectangle r,int radius){using(var p=Path(r,radius))g.DrawPath(b,p);}
 }
+
 
 
