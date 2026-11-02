@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -8,9 +8,9 @@ using System.Windows.Forms;
 
 // A per-pixel alpha surface preserves fractional edge coverage against any desktop.
 sealed class AlphaArtwork : Form {
-    readonly Form host; readonly Image source;string currentValue="30:00";readonly ToolTip hints=new ToolTip{InitialDelay=300,ReshowDelay=100};string hoverText="";
+    public float Glow=0;readonly Form host; readonly Image source;string currentValue="30:00";readonly ToolTip hints=new ToolTip{InitialDelay=300,ReshowDelay=100};string hoverText="";
     public AlphaArtwork(Form owner,Image image){host=owner;source=image;FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;StartPosition=FormStartPosition.Manual;MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){Point pt=e.Location;if(pt.Y>Height*0.9){ReleaseCapture();SendMessage(host.Handle,0xA1,(IntPtr)17,IntPtr.Zero);return;}foreach(Control control in host.Controls)if(control.Bounds.Contains(pt)){var check=control as CheckBox;if(check!=null)check.Checked=!check.Checked;else{var button=control as Button;if(button!=null)button.PerformClick();}if(!IsDisposed)RefreshSurface(currentValue);return;}ReleaseCapture();SendMessage(host.Handle,0xA1,(IntPtr)2,IntPtr.Zero);}};}
-    protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);string text="";foreach(Control c in host.Controls)if(c.Bounds.Contains(e.Location)){text=c.Name=="pin"?(((CheckBox)c).Checked?"È¡Ïû¹Ì¶¨ÔÚ×îÇ°":"¹Ì¶¨ÔÚ×îÇ°"):c.Name=="minimize"?"ÊÕÆğµ½ÏµÍ³ÍĞÅÌ":c.Name=="settings"?"ÉèÖÃÌáĞÑ¼ä¸ô":c.Name=="close"?"¹Ø±Õ²¢ÍË³ö":c.AccessibleName;break;}if(text!=hoverText){hoverText=text;hints.SetToolTip(this,text);}}
+    protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);string text="";foreach(Control c in host.Controls)if(c.Bounds.Contains(e.Location)){text=c.Name=="pin"?(((CheckBox)c).Checked?"å–æ¶ˆå›ºå®šåœ¨æœ€å‰":"å›ºå®šåœ¨æœ€å‰"):c.Name=="minimize"?"æ”¶èµ·åˆ°ç³»ç»Ÿæ‰˜ç›˜":c.Name=="settings"?"è®¾ç½®æé†’é—´éš”":c.Name=="close"?"å…³é—­å¹¶é€€å‡º":c.AccessibleName;break;}if(text!=hoverText){hoverText=text;hints.SetToolTip(this,text);}}
     protected override void Dispose(bool disposing){if(disposing)hints.Dispose();base.Dispose(disposing);}
     protected override bool ShowWithoutActivation{get{return true;}}
     protected override CreateParams CreateParams{get{var p=base.CreateParams;p.ExStyle|=0x80000|0x80;return p;}}
@@ -45,10 +45,11 @@ sealed class AlphaArtwork : Form {
                     for(int i=0;i<8;i++){double angle=i*Math.PI/4;g.DrawLine(pen,(float)Math.Cos(angle)*6,(float)Math.Sin(angle)*6,(float)Math.Cos(angle)*9,(float)Math.Sin(angle)*9);}break;
                 case "close":g.DrawLine(pen,-5,-5,5,5);g.DrawLine(pen,-5,5,5,-5);break;
                 case "action":
+                    if(Glow>0)using(var halo=new SolidBrush(Color.FromArgb((int)(110*Glow),255,242,171)))g.FillEllipse(halo,-20,-20,40,40);
                     using(var shadow=new SolidBrush(Color.FromArgb(65,75,55,32)))g.FillEllipse(shadow,-15,-12,30,30);
                     using(var gradient=new LinearGradientBrush(new Rectangle(-16,-16,32,32),Color.FromArgb(91,167,101),Color.FromArgb(34,108,64),90f))g.FillEllipse(gradient,-15,-15,30,30);
                     using(var white=new Pen(Color.White,2)){white.StartCap=white.EndCap=LineCap.Round;
-                        if(control.Text.StartsWith("ÔË¶¯½áÊø")){g.DrawArc(white,-7,-7,14,14,25,285);g.DrawLines(white,new PointF[]{new PointF(3,-8),new PointF(7,-6),new PointF(7,-11)});}
+                        if(control.AccessibleName=="è¿åŠ¨ç»“æŸï¼Œé‡æ–°è®¡æ—¶"){g.DrawArc(white,-7,-7,14,14,25,285);g.DrawLines(white,new PointF[]{new PointF(3,-8),new PointF(7,-6),new PointF(7,-11)});}
                         else{g.DrawLine(white,-4,-6,-4,6);g.DrawLine(white,4,-6,4,6);}
                     }break;
             }
