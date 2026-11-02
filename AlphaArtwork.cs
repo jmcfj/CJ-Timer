@@ -13,11 +13,11 @@ sealed class AlphaArtwork : Form {
     protected override bool ShowWithoutActivation{get{return true;}}
     protected override CreateParams CreateParams{get{var p=base.CreateParams;p.ExStyle|=0x80000|0x80;return p;}}
     public Bitmap RenderBitmap(string value){
-        int w=host.ClientSize.Width,h=Math.Max(1,(int)(273*host.ClientSize.Height/450f));
+        int w=host.ClientSize.Width,h=Math.Max(1,(int)(273*host.ClientSize.Height/370f));
         using(var large=new Bitmap(w*2,h*2,PixelFormat.Format32bppPArgb)){
             using(var g=Graphics.FromImage(large)){
                 g.SmoothingMode=SmoothingMode.HighQuality;g.InterpolationMode=InterpolationMode.HighQualityBicubic;g.PixelOffsetMode=PixelOffsetMode.HighQuality;
-                float sx=w*2/320f,sy=host.ClientSize.Height*2/450f;
+                float sx=w*2/320f,sy=host.ClientSize.Height*2/370f;
                 g.DrawImage(source,new RectangleF(20*sx,0,280*sx,280*sy));
                 g.TextRenderingHint=TextRenderingHint.AntiAliasGridFit;
                 using(var f=new Font("Segoe UI",36*Math.Min(sx,sy),FontStyle.Bold,GraphicsUnit.Pixel))
