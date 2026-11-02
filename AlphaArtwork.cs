@@ -8,27 +8,28 @@ using System.Windows.Forms;
 
 // A per-pixel alpha surface preserves fractional edge coverage against any desktop.
 sealed class AlphaArtwork : Form {
-    readonly Form host; readonly Image source;
-    public AlphaArtwork(Form owner,Image image){host=owner;source=image;FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;StartPosition=FormStartPosition.Manual;MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(host.Handle,0xA1,(IntPtr)2,IntPtr.Zero);}};}
+    readonly Form host; readonly Image source;string currentValue="30:00";
+    public AlphaArtwork(Form owner,Image image){host=owner;source=image;FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;StartPosition=FormStartPosition.Manual;MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){Point pt=e.Location;if(pt.Y>Height*0.9){ReleaseCapture();SendMessage(host.Handle,0xA1,(IntPtr)17,IntPtr.Zero);return;}foreach(Control control in host.Controls)if(control.Bounds.Contains(pt)){var check=control as CheckBox;if(check!=null)check.Checked=!check.Checked;else{var button=control as Button;if(button!=null)button.PerformClick();}if(!IsDisposed)RefreshSurface(currentValue);return;}ReleaseCapture();SendMessage(host.Handle,0xA1,(IntPtr)2,IntPtr.Zero);}};}
     protected override bool ShowWithoutActivation{get{return true;}}
     protected override CreateParams CreateParams{get{var p=base.CreateParams;p.ExStyle|=0x80000|0x80;return p;}}
     public Bitmap RenderBitmap(string value){
-        int w=host.ClientSize.Width,h=Math.Max(1,(int)(273*host.ClientSize.Height/370f));
+        int w=host.ClientSize.Width,h=Math.Max(1,(int)(280*host.ClientSize.Height/280f));
         using(var large=new Bitmap(w*2,h*2,PixelFormat.Format32bppPArgb)){
             using(var g=Graphics.FromImage(large)){
                 g.SmoothingMode=SmoothingMode.HighQuality;g.InterpolationMode=InterpolationMode.HighQualityBicubic;g.PixelOffsetMode=PixelOffsetMode.HighQuality;
-                float sx=w*2/320f,sy=host.ClientSize.Height*2/370f;
+                float sx=w*2/320f,sy=host.ClientSize.Height*2/280f;
                 g.DrawImage(source,new RectangleF(20*sx,0,280*sx,280*sy));
                 g.TextRenderingHint=TextRenderingHint.AntiAliasGridFit;
-                using(var f=new Font("Segoe UI",36*Math.Min(sx,sy),FontStyle.Bold,GraphicsUnit.Pixel))
+                using(var f=new Font("Segoe UI",32*Math.Min(sx,sy),FontStyle.Bold,GraphicsUnit.Pixel))
                 using(var b=new SolidBrush(Color.FromArgb(74,42,40)))
-                using(var sf=new StringFormat{Alignment=StringAlignment.Center,LineAlignment=StringAlignment.Center})g.DrawString(value,f,b,new RectangleF(55*sx,178*sy,210*sx,50*sy),sf);
+                using(var sf=new StringFormat{Alignment=StringAlignment.Center,LineAlignment=StringAlignment.Center})g.DrawString(value,f,b,new RectangleF(55*sx,176*sy,210*sx,40*sy),sf);
             }
+            using(var g=Graphics.FromImage(large)){g.ScaleTransform(2,2);foreach(Control control in host.Controls){using(var b=new Bitmap(control.Width,control.Height)){control.DrawToBitmap(b,new Rectangle(Point.Empty,control.Size));g.DrawImage(b,control.Bounds);}}}
             var result=new Bitmap(w,h,PixelFormat.Format32bppPArgb);
             using(var g=Graphics.FromImage(result)){g.InterpolationMode=InterpolationMode.HighQualityBicubic;g.PixelOffsetMode=PixelOffsetMode.HighQuality;g.DrawImage(large,new Rectangle(0,0,w,h),0,0,large.Width,large.Height,GraphicsUnit.Pixel);}return result;
         }
     }
-    public void RefreshSurface(string value){
+    public void RefreshSurface(string value){currentValue=value;
         if(IsDisposed||!host.Visible)return;
         using(var bitmap=RenderBitmap(value)){
             IntPtr screen=GetDC(IntPtr.Zero),dc=IntPtr.Zero,hbitmap=IntPtr.Zero,old=IntPtr.Zero;
@@ -51,3 +52,4 @@ sealed class AlphaArtwork : Form {
     [DllImport("user32.dll")]static extern bool ReleaseCapture();
     [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr h,int m,IntPtr w,IntPtr l);
 }
+

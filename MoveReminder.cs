@@ -18,10 +18,10 @@ class MoveReminder : Form {
             if(Array.IndexOf(args,"--check")>=0){
                 controller.popup.Show();Application.DoEvents();
                 if(controller.popup.ShowInTaskbar||controller.popup.alphaArtwork.ShowInTaskbar)throw new Exception("Taskbar visibility regression");if(controller.popup.TimerValue=="00:00")throw new Exception("Startup countdown missing");
-                using(var image=new Bitmap(320,370)){controller.popup.BackColor=Color.White;controller.popup.DrawToBitmap(image,new Rectangle(0,0,320,370));using(var g=Graphics.FromImage(image))using(var art=controller.popup.alphaArtwork.RenderBitmap(controller.popup.TimerValue))g.DrawImageUnscaled(art,0,0);image.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"startup-preview.png"));}
-                controller.popup.ClientSize=new Size(500,500);if(Math.Abs(controller.popup.Height-controller.popup.Width*370.0/320.0)>1)throw new Exception("Aspect ratio failed");
+                using(var image=new Bitmap(320,280)){controller.popup.BackColor=Color.White;controller.popup.DrawToBitmap(image,new Rectangle(0,0,320,280));using(var g=Graphics.FromImage(image))using(var art=controller.popup.alphaArtwork.RenderBitmap(controller.popup.TimerValue))g.DrawImageUnscaled(art,0,0);image.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"startup-preview.png"));}
+                controller.popup.ClientSize=new Size(500,500);if(Math.Abs(controller.popup.Height-controller.popup.Width*280.0/320.0)>1)throw new Exception("Aspect ratio failed");
                 controller.popup.HideToTray();if(controller.popup.Visible||controller.popup.alphaArtwork.Visible||!controller.tray.Visible||!controller.timer.Enabled)throw new Exception("Tray minimize failed");controller.BecomeDue();if(!controller.popup.Visible||!controller.popup.alphaArtwork.Visible)throw new Exception("Due restore failed");controller.Restart();
-                controller.popup.ClientSize=new Size(480,675);if(controller.popup.Region==null)throw new Exception("Resize shape missing");controller.popup.ClientSize=new Size(320,370);controller.BecomeDue();controller.ToggleExercise();if(!controller.exercise)throw new Exception("Pause failed");controller.ToggleExercise();if(controller.exercise||controller.popup.IsDisposed)throw new Exception("Restart failed");
+                controller.popup.ClientSize=new Size(480,675);if(controller.popup.Region==null)throw new Exception("Resize shape missing");controller.popup.ClientSize=new Size(320,280);controller.BecomeDue();controller.ToggleExercise();if(!controller.exercise)throw new Exception("Pause failed");controller.ToggleExercise();if(controller.exercise||controller.popup.IsDisposed)throw new Exception("Restart failed");
                 controller.ExitApp();if(controller.timer.Enabled||!controller.popup.IsDisposed)throw new Exception("Exit failed");return;
             }
             try{Application.Run(controller.popup);}finally{controller.timer.Stop();controller.timer.Dispose();}
@@ -58,49 +58,47 @@ class MoveReminder : Form {
     class Reminder:Form{
         readonly Timer pulse=new Timer();readonly Button button=new Button();        readonly Image artwork;public AlphaArtwork alphaArtwork;bool exercising=false,bright=false;public string TimerValue="30:00";bool isDue=false;bool layoutReady=false;readonly System.Collections.Generic.Dictionary<Control,Font> scaledFonts=new System.Collections.Generic.Dictionary<Control,Font>();
         public Reminder(Action toggle,Action exit,Action settingsAction){
-            Text="动一下 · 西瓜提醒";ClientSize=new Size(320,370);MinimumSize=new Size(280,324);MaximumSize=new Size(640,740);
+            Text="动一下 · 西瓜提醒";ClientSize=new Size(320,280);MinimumSize=new Size(280,245);MaximumSize=new Size(640,560);
             FormBorderStyle=FormBorderStyle.None;TopMost=true;ShowInTaskbar=false;DoubleBuffered=true;
             BackColor=Color.FromArgb(75,42,32);Font=new Font("Microsoft YaHei UI",10);AutoScaleMode=AutoScaleMode.None;
             using(var stream=Assembly.GetExecutingAssembly().GetManifestResourceStream("melon.png"))using(var source=Image.FromStream(stream))artwork=new Bitmap(source);
-            button.SetBounds(29,320,262,38);Style(button);button.BackColor=Color.FromArgb(48,123,76);button.Font=new Font(Font.FontFamily,10,FontStyle.Bold);button.Click+=(s,e)=>toggle();Controls.Add(button);
-            var pin=new CheckBox{Text="固定",Checked=true,Appearance=Appearance.Button,TextAlign=ContentAlignment.MiddleCenter,BackColor=Color.FromArgb(255,249,236)};pin.FlatStyle=FlatStyle.Flat;pin.FlatAppearance.BorderSize=0;pin.SetBounds(29,283,64,28);pin.CheckedChanged+=(s,e)=>TopMost=pin.Checked;Controls.Add(pin);
-            var close=new Button{Text="×",BackColor=Color.FromArgb(255,249,236),FlatStyle=FlatStyle.Flat};close.FlatAppearance.BorderSize=0;close.SetBounds(259,283,32,28);close.AccessibleName="关闭并退出提醒器";close.Click+=(s,e)=>exit();Controls.Add(close);
-            var settingsButton=new Button{Text="设置",FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(255,249,236)};settingsButton.FlatAppearance.BorderSize=0;settingsButton.SetBounds(185,283,64,28);settingsButton.Click+=(s,e)=>settingsAction();Controls.Add(settingsButton);
-            var minimize=new Button{Text="收起",FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(255,249,236)};minimize.FlatAppearance.BorderSize=0;minimize.SetBounds(105,283,64,28);minimize.AccessibleName="最小化到系统托盘";minimize.Click+=(s,e)=>HideToTray();Controls.Add(minimize);
+            button.SetBounds(78,220,164,26);Style(button);button.BackColor=Color.FromArgb(48,123,76);button.Font=new Font(Font.FontFamily,10,FontStyle.Bold);button.Click+=(s,e)=>toggle();Controls.Add(button);
+            var pin=new CheckBox{Text="固定",Checked=true,Appearance=Appearance.Button,TextAlign=ContentAlignment.MiddleCenter,BackColor=Color.FromArgb(255,139,135)};pin.FlatStyle=FlatStyle.Flat;pin.FlatAppearance.BorderSize=0;pin.SetBounds(62,150,48,25);pin.CheckedChanged+=(s,e)=>TopMost=pin.Checked;Controls.Add(pin);
+            var close=new Button{Text="×",BackColor=Color.FromArgb(255,139,135),FlatStyle=FlatStyle.Flat};close.FlatAppearance.BorderSize=0;close.SetBounds(212,150,36,25);close.AccessibleName="关闭并退出提醒器";close.Click+=(s,e)=>exit();Controls.Add(close);
+            var settingsButton=new Button{Text="设置",FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(255,139,135)};settingsButton.FlatAppearance.BorderSize=0;settingsButton.SetBounds(162,150,48,25);settingsButton.Click+=(s,e)=>settingsAction();Controls.Add(settingsButton);
+            var minimize=new Button{Text="收起",FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(255,139,135)};minimize.FlatAppearance.BorderSize=0;minimize.SetBounds(112,150,48,25);minimize.AccessibleName="最小化到系统托盘";minimize.Click+=(s,e)=>HideToTray();Controls.Add(minimize);
             foreach(Control control in Controls)control.Tag=control.Bounds;
             layoutReady=true;Resize+=(s,e)=>Relayout();Relayout();
-            Shown+=(s,e)=>{Position();alphaArtwork=new AlphaArtwork(this,artwork);alphaArtwork.Show(this);alphaArtwork.RefreshSurface(TimerValue);};LocationChanged+=(s,e)=>{if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);};pulse.Interval=850;pulse.Tick+=(s,e)=>{bright=!bright;Invalidate();};FormClosed+=(s,e)=>{pulse.Dispose();if(alphaArtwork!=null)alphaArtwork.Close();artwork.Dispose();foreach(var font in scaledFonts.Values)font.Dispose();};RefreshState(false);
+            Shown+=(s,e)=>{Position();alphaArtwork=new AlphaArtwork(this,artwork);alphaArtwork.Show(this);alphaArtwork.RefreshSurface(TimerValue);};LocationChanged+=(s,e)=>{if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);};pulse.Interval=850;pulse.Tick+=(s,e)=>{bright=!bright;button.BackColor=bright?Color.FromArgb(76,166,99):Color.FromArgb(48,123,76);if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);Invalidate();};FormClosed+=(s,e)=>{pulse.Dispose();if(alphaArtwork!=null)alphaArtwork.Close();artwork.Dispose();foreach(var font in scaledFonts.Values)font.Dispose();};RefreshState(false);
             MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(Handle,0xA1,(IntPtr)2,IntPtr.Zero);}};
         }
         public void HideToTray(){if(alphaArtwork!=null)alphaArtwork.Hide();Hide();}
         public void RestoreFromTray(){Show();WindowState=FormWindowState.Normal;if(alphaArtwork!=null){if(!alphaArtwork.Visible)alphaArtwork.Show();alphaArtwork.RefreshSurface(TimerValue);}Activate();}
         protected override void SetBoundsCore(int x,int y,int width,int height,BoundsSpecified specified){
             if(layoutReady&&(specified&BoundsSpecified.Size)!=0){
-                int w=width!=Width?width:(int)Math.Round(height*320.0/370.0);
-                width=Math.Max(280,Math.Min(640,w));height=(int)Math.Round(width*370.0/320.0);
+                int w=width!=Width?width:(int)Math.Round(height*320.0/280.0);
+                width=Math.Max(280,Math.Min(640,w));height=(int)Math.Round(width*280.0/320.0);
             }
             base.SetBoundsCore(x,y,width,height,specified);
         }
         void Relayout(){
             if(!layoutReady||ClientSize.Width<1||ClientSize.Height<1)return;
-            float sx=ClientSize.Width/320f,sy=ClientSize.Height/370f;
+            float sx=ClientSize.Width/320f,sy=ClientSize.Height/280f;
             foreach(Control control in Controls){Rectangle b=(Rectangle)control.Tag;control.SetBounds((int)(b.X*sx),(int)(b.Y*sy),(int)(b.Width*sx),(int)(b.Height*sy));
                 Font oldFont;scaledFonts.TryGetValue(control,out oldFont);control.Font=new Font("Microsoft YaHei UI",(10)*Math.Min(sx,sy),control==button?FontStyle.Bold:FontStyle.Regular);scaledFonts[control]=control.Font;if(oldFont!=null)oldFont.Dispose();}
-            using(var path=RoundedDrawing.Path(new Rectangle((int)(17*sx),(int)(273*sy),(int)(286*sx),(int)(95*sy)),(int)(18*Math.Min(sx,sy)))){
-                var previous=Region;Region=new Region(path);if(previous!=null)previous.Dispose();
-            }
+            var region=new Region();region.MakeEmpty();foreach(Control control in Controls)region.Union(control.Bounds);var previous=Region;Region=region;if(previous!=null)previous.Dispose();
             if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);Invalidate();
         }
         protected override void WndProc(ref Message m){
             if(m.Msg==0x214&&layoutReady){
                 var r=(NativeRect)System.Runtime.InteropServices.Marshal.PtrToStructure(m.LParam,typeof(NativeRect));
                 int edge=m.WParam.ToInt32();int width=r.Right-r.Left,height=r.Bottom-r.Top;
-                if(edge==3||edge==6){width=Math.Max(280,Math.Min(640,(int)Math.Round(height*320.0/370.0)));height=(int)Math.Round(width*370.0/320.0);r.Right=r.Left+width;if(edge==3)r.Top=r.Bottom-height;else r.Bottom=r.Top+height;}
-                else{width=Math.Max(280,Math.Min(640,width));height=(int)Math.Round(width*370.0/320.0);if(edge==1||edge==4||edge==7)r.Left=r.Right-width;else r.Right=r.Left+width;if(edge==4||edge==5)r.Top=r.Bottom-height;else r.Bottom=r.Top+height;}
+                if(edge==3||edge==6){width=Math.Max(280,Math.Min(640,(int)Math.Round(height*320.0/280.0)));height=(int)Math.Round(width*280.0/320.0);r.Right=r.Left+width;if(edge==3)r.Top=r.Bottom-height;else r.Bottom=r.Top+height;}
+                else{width=Math.Max(280,Math.Min(640,width));height=(int)Math.Round(width*280.0/320.0);if(edge==1||edge==4||edge==7)r.Left=r.Right-width;else r.Right=r.Left+width;if(edge==4||edge==5)r.Top=r.Bottom-height;else r.Bottom=r.Top+height;}
                 System.Runtime.InteropServices.Marshal.StructureToPtr(r,m.LParam,false);m.Result=(IntPtr)1;return;
             }
             base.WndProc(ref m);
-            if(m.Msg==0x84&&layoutReady){long packed=m.LParam.ToInt64();Point p=PointToClient(new Point((short)(packed&65535),(short)((packed>>16)&65535)));float sx=ClientSize.Width/320f,sy=ClientSize.Height/370f;
+            if(m.Msg==0x84&&layoutReady){long packed=m.LParam.ToInt64();Point p=PointToClient(new Point((short)(packed&65535),(short)((packed>>16)&65535)));float sx=ClientSize.Width/320f,sy=ClientSize.Height/280f;
                 bool left=p.X<25*sx,right=p.X>295*sx,bottom=p.Y>358*sy,top=p.Y<12*sy;
                 if(p.Y>280*sy||top)m.Result=(IntPtr)(bottom?(left?16:right?17:15):top?(left?13:right?14:12):left?10:right?11:1);
             }
@@ -110,15 +108,11 @@ class MoveReminder : Form {
         [System.Runtime.InteropServices.DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr h,int m,IntPtr w,IntPtr l);
         void Position(){var area=Screen.FromPoint(Cursor.Position).WorkingArea;Location=new Point(area.Right-Width-12,area.Bottom-Height-12);}
         public void UpdateTimer(string value,bool due,bool active){bool changed=TimerValue!=value;TimerValue=value;if(changed&&alphaArtwork!=null)alphaArtwork.RefreshSurface(value);isDue=due;if(due&&!active)pulse.Start();else pulse.Stop();Invalidate();}
-        public void RefreshState(bool active){exercising=active;button.Text=active?"运动结束，重新计时":"暂停提醒，去运动";if(active)pulse.Stop();else pulse.Start();Invalidate();}
+        public void RefreshState(bool active){exercising=active;button.Text=active?"运动结束，重新计时":"暂停提醒，去运动";if(active)pulse.Stop();else pulse.Start();if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);Invalidate();}
         protected override bool ShowWithoutActivation{get{return true;}}
-        protected override void OnPaint(PaintEventArgs e){
-            base.OnPaint(e);var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;g.InterpolationMode=InterpolationMode.HighQualityBicubic;g.ScaleTransform(ClientSize.Width/320f,ClientSize.Height/370f);
+        public void ClickAt(Point point){foreach(Control control in Controls)if(control.Bounds.Contains(point)){var check=control as CheckBox;if(check!=null)check.Checked=!check.Checked;else{var buttonControl=control as Button;if(buttonControl!=null)buttonControl.PerformClick();}if(alphaArtwork!=null&&!alphaArtwork.IsDisposed)alphaArtwork.RefreshSurface(TimerValue);return;}}
+        public void PaintControls(Graphics g){foreach(Control control in Controls){using(var image=new Bitmap(control.Width,control.Height)){control.DrawToBitmap(image,new Rectangle(Point.Empty,control.Size));g.DrawImage(image,control.Bounds);}}}
 
-            using(var brush=new SolidBrush(Color.FromArgb(255,249,236)))g.FillRoundedRectangle(brush,new Rectangle(17,273,286,95),18);
-            using(var pen=new Pen(isDue&&!exercising&&bright?Color.FromArgb(88,170,101):Color.FromArgb(221,230,202),3))g.DrawRoundedRectangle(pen,new Rectangle(17,273,286,95),18);
-
-        }
     }
 }
 static class RoundedDrawing{
@@ -126,6 +120,7 @@ static class RoundedDrawing{
     public static void FillRoundedRectangle(this Graphics g,Brush b,Rectangle r,int radius){using(var p=Path(r,radius))g.FillPath(b,p);}
     public static void DrawRoundedRectangle(this Graphics g,Pen b,Rectangle r,int radius){using(var p=Path(r,radius))g.DrawPath(b,p);}
 }
+
 
 
 
