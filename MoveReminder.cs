@@ -21,6 +21,8 @@ class MoveReminder : Form {
                 controller.popup.Show();Application.DoEvents();
                 if(controller.popup.ShowInTaskbar||controller.popup.alphaArtwork.ShowInTaskbar)throw new Exception("Taskbar visibility regression");if(controller.popup.TimerValue=="00:00")throw new Exception("Startup countdown missing");
                 using(var image=new Bitmap(320,450)){controller.popup.BackColor=Color.White;controller.popup.DrawToBitmap(image,new Rectangle(0,0,320,450));using(var g=Graphics.FromImage(image))using(var art=controller.popup.alphaArtwork.RenderBitmap(controller.popup.TimerValue))g.DrawImageUnscaled(art,0,0);image.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"startup-preview.png"));}
+                controller.popup.ClientSize=new Size(500,500);if(Math.Abs(controller.popup.Height-controller.popup.Width*450.0/320.0)>1)throw new Exception("Aspect ratio failed");
+                controller.popup.HideToTray();if(controller.popup.Visible||controller.popup.alphaArtwork.Visible||!controller.tray.Visible||!controller.timer.Enabled)throw new Exception("Tray minimize failed");controller.BecomeDue();if(!controller.popup.Visible||!controller.popup.alphaArtwork.Visible)throw new Exception("Due restore failed");controller.Restart();
                 controller.popup.ClientSize=new Size(480,675);if(controller.popup.Region==null)throw new Exception("Resize shape missing");controller.popup.ClientSize=new Size(320,450);controller.BecomeDue();controller.ToggleExercise();if(!controller.exercise)throw new Exception("Pause failed");controller.ToggleExercise();if(controller.exercise||controller.popup.IsDisposed)throw new Exception("Restart failed");
                 controller.ExitApp();if(controller.timer.Enabled||!controller.popup.IsDisposed)throw new Exception("Exit failed");return;
             }
@@ -32,6 +34,9 @@ class MoveReminder : Form {
         try {int n;if(int.TryParse(File.ReadAllText(settings),out n)&&n>=1&&n<=240)interval=n;}catch{}
         try {var lines=File.ReadAllLines(contentPath);if(lines.Length>=2){reminderTitle=lines[0];reminderBody=string.Join(Environment.NewLine,lines,1,lines.Length-1);}}catch{}
         timer.Interval=500;timer.Tick+=(s,e)=>{if(!exercise&&!due&&DateTime.UtcNow>=deadline)BecomeDue();UpdateUI();};Restart();timer.Start();
+        var trayMenu=new ContextMenuStrip();trayMenu.Items.Add("显示西瓜计时器",null,(s,e)=>popup.RestoreFromTray());trayMenu.Items.Add("最小化到托盘",null,(s,e)=>popup.HideToTray());trayMenu.Items.Add("退出",null,(s,e)=>ExitApp());
+        tray.Icon=SystemIcons.Information;tray.Text="动一下 · 西瓜提醒";tray.ContextMenuStrip=trayMenu;tray.DoubleClick+=(s,e)=>popup.RestoreFromTray();tray.Visible=true;
+        popup.FormClosed+=(s,e)=>{timer.Stop();tray.Visible=false;tray.Dispose();};
         FormClosing+=(s,e)=>{timer.Stop();if(popup!=null&&!popup.IsDisposed)popup.Close();tray.Visible=false;tray.Dispose();};
     }
     Label LabelAt(string text,int x,int y,int w,int h,int size,bool bold){var l=new Label{Text=text,Font=new Font("Microsoft YaHei UI",size,bold?FontStyle.Bold:FontStyle.Regular),TextAlign=ContentAlignment.MiddleLeft};l.SetBounds(x,y,w,h);Controls.Add(l);return l;}
@@ -41,7 +46,7 @@ class MoveReminder : Form {
         if(popup==null)popup=new Reminder(ToggleExercise,reminderTitle,reminderBody,ExitApp,EditContent);
         popup.RefreshState(false);UpdateUI();}
     void ToggleExercise(){if(exercise){Restart();return;}exercise=true;due=false;popup.RefreshState(true);UpdateUI();}
-    void BecomeDue(){if(exercise)return;due=true;popup.RefreshState(false);popup.TopMost=true;UpdateUI();}
+    void BecomeDue(){if(exercise)return;due=true;popup.RestoreFromTray();popup.RefreshState(false);popup.TopMost=true;UpdateUI();}
     void UpdateUI(){var remaining=Math.Max(0,(int)Math.Ceiling((deadline-DateTime.UtcNow).TotalSeconds));
         popup.UpdateTimer(exercise?"休息中":string.Format("{0:00}:{1:00}",remaining/60,remaining%60),due,exercise);}
     void EditContent(){
@@ -72,10 +77,20 @@ class MoveReminder : Form {
             var pin=new CheckBox{Text="固定",Checked=true,Appearance=Appearance.Button,TextAlign=ContentAlignment.MiddleCenter,BackColor=Color.FromArgb(255,249,236)};pin.FlatStyle=FlatStyle.Flat;pin.FlatAppearance.BorderSize=0;pin.SetBounds(29,283,64,28);pin.CheckedChanged+=(s,e)=>TopMost=pin.Checked;Controls.Add(pin);
             var close=new Button{Text="×",BackColor=Color.FromArgb(255,249,236),FlatStyle=FlatStyle.Flat};close.FlatAppearance.BorderSize=0;close.SetBounds(259,283,32,28);close.AccessibleName="关闭并退出提醒器";close.Click+=(s,e)=>exit();Controls.Add(close);
             var settingsButton=new Button{Text="设置",FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(255,249,236)};settingsButton.FlatAppearance.BorderSize=0;settingsButton.SetBounds(185,283,64,28);settingsButton.Click+=(s,e)=>settingsAction();Controls.Add(settingsButton);
+            var minimize=new Button{Text="收起",FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(255,249,236)};minimize.FlatAppearance.BorderSize=0;minimize.SetBounds(105,283,64,28);minimize.AccessibleName="最小化到系统托盘";minimize.Click+=(s,e)=>HideToTray();Controls.Add(minimize);
             foreach(Control control in Controls)control.Tag=control.Bounds;
             layoutReady=true;Resize+=(s,e)=>Relayout();Relayout();
             Shown+=(s,e)=>{Position();alphaArtwork=new AlphaArtwork(this,artwork);alphaArtwork.Show(this);alphaArtwork.RefreshSurface(TimerValue);};LocationChanged+=(s,e)=>{if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);};pulse.Interval=850;pulse.Tick+=(s,e)=>{bright=!bright;Invalidate();};FormClosed+=(s,e)=>{pulse.Dispose();if(alphaArtwork!=null)alphaArtwork.Close();artwork.Dispose();foreach(var font in scaledFonts.Values)font.Dispose();};RefreshState(false);
             MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(Handle,0xA1,(IntPtr)2,IntPtr.Zero);}};
+        }
+        public void HideToTray(){if(alphaArtwork!=null)alphaArtwork.Hide();Hide();}
+        public void RestoreFromTray(){Show();WindowState=FormWindowState.Normal;if(alphaArtwork!=null){if(!alphaArtwork.Visible)alphaArtwork.Show();alphaArtwork.RefreshSurface(TimerValue);}Activate();}
+        protected override void SetBoundsCore(int x,int y,int width,int height,BoundsSpecified specified){
+            if(layoutReady&&(specified&BoundsSpecified.Size)!=0){
+                int w=width!=Width?width:(int)Math.Round(height*320.0/450.0);
+                width=Math.Max(280,Math.Min(640,w));height=(int)Math.Round(width*450.0/320.0);
+            }
+            base.SetBoundsCore(x,y,width,height,specified);
         }
         void Relayout(){
             if(!layoutReady||ClientSize.Width<1||ClientSize.Height<1)return;
@@ -88,12 +103,20 @@ class MoveReminder : Form {
             if(alphaArtwork!=null)alphaArtwork.RefreshSurface(TimerValue);Invalidate();
         }
         protected override void WndProc(ref Message m){
+            if(m.Msg==0x214&&layoutReady){
+                var r=(NativeRect)System.Runtime.InteropServices.Marshal.PtrToStructure(m.LParam,typeof(NativeRect));
+                int edge=m.WParam.ToInt32();int width=r.Right-r.Left,height=r.Bottom-r.Top;
+                if(edge==3||edge==6){width=Math.Max(280,Math.Min(640,(int)Math.Round(height*320.0/450.0)));height=(int)Math.Round(width*450.0/320.0);r.Right=r.Left+width;if(edge==3)r.Top=r.Bottom-height;else r.Bottom=r.Top+height;}
+                else{width=Math.Max(280,Math.Min(640,width));height=(int)Math.Round(width*450.0/320.0);if(edge==1||edge==4||edge==7)r.Left=r.Right-width;else r.Right=r.Left+width;if(edge==4||edge==5)r.Top=r.Bottom-height;else r.Bottom=r.Top+height;}
+                System.Runtime.InteropServices.Marshal.StructureToPtr(r,m.LParam,false);m.Result=(IntPtr)1;return;
+            }
             base.WndProc(ref m);
             if(m.Msg==0x84&&layoutReady){long packed=m.LParam.ToInt64();Point p=PointToClient(new Point((short)(packed&65535),(short)((packed>>16)&65535)));float sx=ClientSize.Width/320f,sy=ClientSize.Height/450f;
                 bool left=p.X<25*sx,right=p.X>295*sx,bottom=p.Y>430*sy,top=p.Y<12*sy;
                 if(p.Y>280*sy||top)m.Result=(IntPtr)(bottom?(left?16:right?17:15):top?(left?13:right?14:12):left?10:right?11:1);
             }
         }
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]struct NativeRect{public int Left,Top,Right,Bottom;}
         [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool ReleaseCapture();
         [System.Runtime.InteropServices.DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr h,int m,IntPtr w,IntPtr l);
         void Position(){var area=Screen.FromPoint(Cursor.Position).WorkingArea;Location=new Point(area.Right-Width-12,area.Bottom-Height-12);}
@@ -115,6 +138,7 @@ static class RoundedDrawing{
     public static void FillRoundedRectangle(this Graphics g,Brush b,Rectangle r,int radius){using(var p=Path(r,radius))g.FillPath(b,p);}
     public static void DrawRoundedRectangle(this Graphics g,Pen b,Rectangle r,int radius){using(var p=Path(r,radius))g.DrawPath(b,p);}
 }
+
 
 
 
