@@ -4,6 +4,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Windows.Forms;
 using System.IO;
+using System.Reflection;
 
 class MoveReminder : Form {
     static readonly Color Blue=Color.FromArgb(18,99,237), Ink=Color.FromArgb(20,41,72);
@@ -13,7 +14,7 @@ class MoveReminder : Form {
     string reminderTitle="该起来活动啦！", reminderBody="不要久坐不动，站起来走走、伸展一下。\n下一段专注，从活动身体开始。";
     readonly string contentPath=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"MoveReminder","content.txt");
     readonly string settings=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"MoveReminder","interval.txt");
-    [STAThread] static void Main(string[] args){Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);if(Array.IndexOf(args,"--check")>=0){using(var f=new MoveReminder()){f.CreateControl();using(var image=new Bitmap(244,244)){f.ring.Value="28:50";f.ring.DrawToBitmap(image,new Rectangle(0,0,244,244));image.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"font-check.png"));}f.BecomeDue();if(f.popup==null)throw new Exception("Missing reminder");f.popup.SetContent("自定义测试","起身走动一下");f.ToggleExercise();if(!f.exercise||f.due)throw new Exception("Pause failed");f.ToggleExercise();if(f.exercise||f.due||f.popup!=null)throw new Exception("Restart failed");f.tray.Dispose();f.timer.Dispose();}return;}Application.Run(new MoveReminder());}
+    [STAThread] static void Main(string[] args){Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);if(Array.IndexOf(args,"--check")>=0){using(var f=new MoveReminder()){f.CreateControl();using(var image=new Bitmap(244,244)){f.ring.Value="28:50";f.ring.DrawToBitmap(image,new Rectangle(0,0,244,244));image.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"font-check.png"));}f.BecomeDue();if(f.popup==null)throw new Exception("Missing reminder");f.popup.BackColor=Color.White;using(var preview=new Bitmap(320,398)){f.popup.DrawToBitmap(preview,new Rectangle(0,0,320,398));preview.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"melon-preview.png"));}f.popup.SetContent("自定义测试","起身走动一下");f.ToggleExercise();if(!f.exercise||f.due)throw new Exception("Pause failed");f.ToggleExercise();if(f.exercise||f.due||f.popup!=null)throw new Exception("Restart failed");f.tray.Dispose();f.timer.Dispose();}return;}Application.Run(new MoveReminder());}
     public MoveReminder(){
         Text="动一下 · MOVE"; ClientSize=new Size(480,650); MinimumSize=MaximumSize=Size; MaximizeBox=false; BackColor=Color.White; ForeColor=Ink; Font=new Font("Microsoft YaHei UI",11,FontStyle.Regular); StartPosition=FormStartPosition.CenterScreen; AutoScaleMode=AutoScaleMode.Dpi;
         try {int n;if(int.TryParse(File.ReadAllText(settings),out n)&&n>=1&&n<=240)interval=n;}catch{}
@@ -29,6 +30,7 @@ class MoveReminder : Form {
         var customize=new Button{Text="自定义提醒内容"};customize.SetBounds(218,580,236,36);customize.Click+=(s,e)=>EditContent();Controls.Add(customize);
         LabelAt("关闭窗口后仍在托盘运行",26,619,428,26,10,false);
         var menu=new ContextMenuStrip();menu.Items.Add("打开主界面",null,(s,e)=>ShowMain());menu.Items.Add("退出提醒器",null,(s,e)=>{quitting=true;Close();});tray.Icon=SystemIcons.Information;tray.Text="动一下 · MOVE";tray.ContextMenuStrip=menu;tray.Visible=true;tray.DoubleClick+=(s,e)=>ShowMain();
+        MinimumSize=Size.Empty;MaximumSize=Size.Empty;Scale(new SizeF(0.86f,0.86f));MinimumSize=MaximumSize=Size;
         timer.Interval=500;timer.Tick+=(s,e)=>{if(!exercise&&!due&&DateTime.UtcNow>=deadline)BecomeDue();UpdateUI();};Restart();timer.Start();
         FormClosing+=(s,e)=>{if(!quitting&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();}else{timer.Stop();if(popup!=null)popup.Close();tray.Dispose();}};
     }
@@ -81,21 +83,39 @@ class MoveReminder : Form {
         }
     }
     class Reminder:Form{
-        readonly Timer pulse=new Timer(); readonly Button button=new Button(); readonly Label heading=new Label();readonly TextBox message=new TextBox{Multiline=true,ReadOnly=true,BorderStyle=BorderStyle.None,ScrollBars=ScrollBars.Vertical,BackColor=Color.White};bool exercising=false,bright=false;
-        string customTitle,customBody;
-        public Reminder(Action toggle,string title,string body){customTitle=title;customBody=body;Text="动一下 · 久坐提醒";ClientSize=new Size(390,340);FormBorderStyle=FormBorderStyle.FixedToolWindow;MaximizeBox=false;MinimizeBox=false;ControlBox=false;TopMost=true;ShowInTaskbar=false;BackColor=Color.White;Font=new Font("Microsoft YaHei UI",11);AutoScaleMode=AutoScaleMode.Dpi;
-            heading.SetBounds(25,22,340,68);heading.Font=new Font(Font.FontFamily,18,FontStyle.Bold);heading.ForeColor=Ink;Controls.Add(heading);message.SetBounds(25,100,340,125);message.TabStop=true;message.ForeColor=Ink;Controls.Add(message);button.SetBounds(25,250,340,62);Style(button);button.Click+=(s,e)=>toggle();Controls.Add(button);
-            Shown+=(s,e)=>Position();SystemEventsHook();pulse.Interval=850;pulse.Tick+=(s,e)=>{bright=!bright;Invalidate();};pulse.Start();FormClosed+=(s,e)=>pulse.Dispose();RefreshState(false);
+        readonly Timer pulse=new Timer();readonly Button button=new Button();readonly Label heading=new Label();
+        readonly TextBox message=new TextBox{Multiline=true,ReadOnly=true,BorderStyle=BorderStyle.None,ScrollBars=ScrollBars.Vertical,BackColor=Color.FromArgb(255,249,236)};
+        readonly Image artwork;bool exercising=false,bright=false;string customTitle,customBody;
+        public Reminder(Action toggle,string title,string body){
+            customTitle=title;customBody=body;Text="动一下 · 西瓜提醒";ClientSize=new Size(320,398);
+            FormBorderStyle=FormBorderStyle.None;TopMost=true;ShowInTaskbar=false;DoubleBuffered=true;
+            BackColor=Color.FromArgb(255,0,255);TransparencyKey=BackColor;Font=new Font("Microsoft YaHei UI",10);AutoScaleMode=AutoScaleMode.None;
+            using(var stream=Assembly.GetExecutingAssembly().GetManifestResourceStream("melon.png"))using(var source=Image.FromStream(stream))artwork=new Bitmap(source);
+            heading.SetBounds(29,278,262,28);heading.Font=new Font(Font.FontFamily,12,FontStyle.Bold);heading.TextAlign=ContentAlignment.MiddleCenter;heading.BackColor=Color.FromArgb(255,249,236);heading.ForeColor=Ink;Controls.Add(heading);
+            message.SetBounds(29,309,262,34);message.ForeColor=Ink;Controls.Add(message);
+            button.SetBounds(29,351,262,38);Style(button);button.BackColor=Color.FromArgb(48,123,76);button.Font=new Font(Font.FontFamily,10,FontStyle.Bold);button.Click+=(s,e)=>toggle();Controls.Add(button);
+            Shown+=(s,e)=>Position();pulse.Interval=850;pulse.Tick+=(s,e)=>{bright=!bright;Invalidate();};FormClosed+=(s,e)=>{pulse.Dispose();artwork.Dispose();};RefreshState(false);
+            MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(Handle,0xA1,(IntPtr)2,IntPtr.Zero);}};
         }
-        void SystemEventsHook(){LocationChanged+=(s,e)=>{};}
-        void Position(){var area=Screen.FromPoint(Cursor.Position).WorkingArea;Location=new Point(area.Right-Width-16,area.Bottom-Height-16);}
+        [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool ReleaseCapture();
+        [System.Runtime.InteropServices.DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr h,int m,IntPtr w,IntPtr l);
+        void Position(){var area=Screen.FromPoint(Cursor.Position).WorkingArea;Location=new Point(area.Right-Width-12,area.Bottom-Height-12);}
         public void SetContent(string title,string body){customTitle=title;customBody=body;RefreshState(exercising);}
-        public void RefreshState(bool active){exercising=active;heading.Text=active?"享受活动的时间":customTitle;message.Text=active?"计时和闪动已暂停。\n运动结束后，点击下方按钮开启新一轮。":customBody;button.Text=active?"运动结束，重新计时":"暂停提醒，去运动";if(active)pulse.Stop();else pulse.Start();Invalidate();}
+        public void RefreshState(bool active){exercising=active;heading.Text=active?"享受活动的时间":customTitle;message.Text=active?"提醒已暂停，运动结束后再开始。":customBody;message.Select(0,0);button.Text=active?"运动结束，重新计时":"暂停提醒，去运动";if(active)pulse.Stop();else pulse.Start();Invalidate();}
         protected override bool ShowWithoutActivation{get{return true;}}
-        protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);using(var pen=new Pen(!exercising&&bright?Blue:Color.FromArgb(202,222,255),5))e.Graphics.DrawRectangle(pen,2,2,ClientSize.Width-5,ClientSize.Height-5);}
+        protected override void OnPaint(PaintEventArgs e){
+            base.OnPaint(e);var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;g.InterpolationMode=InterpolationMode.HighQualityBicubic;
+            g.DrawImage(artwork,new Rectangle(0,0,320,280));
+            using(var brush=new SolidBrush(Color.FromArgb(255,249,236)))g.FillRoundedRectangle(brush,new Rectangle(17,269,286,127),18);
+            using(var pen=new Pen(!exercising&&bright?Color.FromArgb(88,170,101):Color.FromArgb(221,230,202),3))g.DrawRoundedRectangle(pen,new Rectangle(17,269,286,127),18);
+            using(var font=new Font("Segoe UI",27,FontStyle.Bold))TextRenderer.DrawText(g,exercising?"休息中":"00:00",font,new Rectangle(55,178,210,50),Color.FromArgb(74,42,40),TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.NoPadding);
+        }
     }
 }
-
-
+static class RoundedDrawing{
+    static GraphicsPath Path(Rectangle r,int radius){var p=new GraphicsPath();int d=radius*2;p.AddArc(r.X,r.Y,d,d,180,90);p.AddArc(r.Right-d,r.Y,d,d,270,90);p.AddArc(r.Right-d,r.Bottom-d,d,d,0,90);p.AddArc(r.X,r.Bottom-d,d,d,90,90);p.CloseFigure();return p;}
+    public static void FillRoundedRectangle(this Graphics g,Brush b,Rectangle r,int radius){using(var p=Path(r,radius))g.FillPath(b,p);}
+    public static void DrawRoundedRectangle(this Graphics g,Pen b,Rectangle r,int radius){using(var p=Path(r,radius))g.DrawPath(b,p);}
+}
 
 
