@@ -21,7 +21,7 @@ class MoveReminder : Form {
                 controller.popup.Show();Application.DoEvents();
                 if(controller.popup.TimerValue=="00:00")throw new Exception("Startup countdown missing");
                 using(var image=new Bitmap(320,450)){controller.popup.BackColor=Color.White;controller.popup.DrawToBitmap(image,new Rectangle(0,0,320,450));image.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"startup-preview.png"));}
-                controller.BecomeDue();controller.ToggleExercise();if(!controller.exercise)throw new Exception("Pause failed");controller.ToggleExercise();if(controller.exercise||controller.popup.IsDisposed)throw new Exception("Restart failed");
+                controller.popup.ClientSize=new Size(480,675);if(controller.popup.Region==null)throw new Exception("Resize shape missing");controller.popup.ClientSize=new Size(320,450);controller.BecomeDue();controller.ToggleExercise();if(!controller.exercise)throw new Exception("Pause failed");controller.ToggleExercise();if(controller.exercise||controller.popup.IsDisposed)throw new Exception("Restart failed");
                 controller.ExitApp();if(controller.timer.Enabled||!controller.popup.IsDisposed)throw new Exception("Exit failed");return;
             }
             try{Application.Run(controller.popup);}finally{controller.timer.Stop();controller.timer.Dispose();}
@@ -60,20 +60,44 @@ class MoveReminder : Form {
     class Reminder:Form{
         readonly Timer pulse=new Timer();readonly Button button=new Button();readonly Label heading=new Label();
         readonly TextBox message=new TextBox{Multiline=true,ReadOnly=true,BorderStyle=BorderStyle.None,ScrollBars=ScrollBars.Vertical,BackColor=Color.FromArgb(255,249,236)};
-        readonly Image artwork;bool exercising=false,bright=false;string customTitle,customBody;public string TimerValue="30:00";bool isDue=false;
+        readonly Image artwork;bool exercising=false,bright=false;string customTitle,customBody;public string TimerValue="30:00";bool isDue=false;bool layoutReady=false;readonly System.Collections.Generic.Dictionary<Control,Font> scaledFonts=new System.Collections.Generic.Dictionary<Control,Font>();
         public Reminder(Action toggle,string title,string body,Action exit,Action settingsAction){
-            customTitle=title;customBody=body;Text="动一下 · 西瓜提醒";ClientSize=new Size(320,450);
+            customTitle=title;customBody=body;Text="动一下 · 西瓜提醒";ClientSize=new Size(320,450);MinimumSize=new Size(280,394);MaximumSize=new Size(640,900);
             FormBorderStyle=FormBorderStyle.None;TopMost=true;ShowInTaskbar=true;DoubleBuffered=true;
-            BackColor=Color.FromArgb(255,0,255);TransparencyKey=BackColor;Font=new Font("Microsoft YaHei UI",10);AutoScaleMode=AutoScaleMode.None;
+            BackColor=Color.FromArgb(75,42,32);Font=new Font("Microsoft YaHei UI",10);AutoScaleMode=AutoScaleMode.None;
             using(var stream=Assembly.GetExecutingAssembly().GetManifestResourceStream("melon.png"))using(var source=Image.FromStream(stream))artwork=new Bitmap(source);
             heading.SetBounds(29,322,262,28);heading.Font=new Font(Font.FontFamily,12,FontStyle.Bold);heading.TextAlign=ContentAlignment.MiddleCenter;heading.BackColor=Color.FromArgb(255,249,236);heading.ForeColor=Ink;Controls.Add(heading);
             message.SetBounds(29,353,262,34);message.ForeColor=Ink;Controls.Add(message);
             button.SetBounds(29,395,262,38);Style(button);button.BackColor=Color.FromArgb(48,123,76);button.Font=new Font(Font.FontFamily,10,FontStyle.Bold);button.Click+=(s,e)=>toggle();Controls.Add(button);
-            var pin=new CheckBox{Text="固定",Checked=true,Appearance=Appearance.Button,TextAlign=ContentAlignment.MiddleCenter,BackColor=Color.FromArgb(255,249,236)};pin.FlatStyle=FlatStyle.Flat;pin.FlatAppearance.BorderSize=0;pin.SetBounds(24,12,64,28);pin.CheckedChanged+=(s,e)=>TopMost=pin.Checked;Controls.Add(pin);
-            var close=new Button{Text="×",BackColor=Color.FromArgb(255,249,236),FlatStyle=FlatStyle.Flat};close.FlatAppearance.BorderSize=0;close.SetBounds(264,12,32,28);close.AccessibleName="关闭并退出提醒器";close.Click+=(s,e)=>exit();Controls.Add(close);
-            var settingsButton=new Button{Text="设置",FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(255,249,236)};settingsButton.FlatAppearance.BorderSize=0;settingsButton.SetBounds(190,12,64,28);settingsButton.Click+=(s,e)=>settingsAction();Controls.Add(settingsButton);
-            Shown+=(s,e)=>Position();pulse.Interval=850;pulse.Tick+=(s,e)=>{bright=!bright;Invalidate();};FormClosed+=(s,e)=>{pulse.Dispose();artwork.Dispose();};RefreshState(false);
+            var pin=new CheckBox{Text="固定",Checked=true,Appearance=Appearance.Button,TextAlign=ContentAlignment.MiddleCenter,BackColor=Color.FromArgb(255,249,236)};pin.FlatStyle=FlatStyle.Flat;pin.FlatAppearance.BorderSize=0;pin.SetBounds(29,283,64,28);pin.CheckedChanged+=(s,e)=>TopMost=pin.Checked;Controls.Add(pin);
+            var close=new Button{Text="×",BackColor=Color.FromArgb(255,249,236),FlatStyle=FlatStyle.Flat};close.FlatAppearance.BorderSize=0;close.SetBounds(259,283,32,28);close.AccessibleName="关闭并退出提醒器";close.Click+=(s,e)=>exit();Controls.Add(close);
+            var settingsButton=new Button{Text="设置",FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(255,249,236)};settingsButton.FlatAppearance.BorderSize=0;settingsButton.SetBounds(185,283,64,28);settingsButton.Click+=(s,e)=>settingsAction();Controls.Add(settingsButton);
+            foreach(Control control in Controls)control.Tag=control.Bounds;
+            layoutReady=true;Resize+=(s,e)=>Relayout();Relayout();
+            Shown+=(s,e)=>Position();pulse.Interval=850;pulse.Tick+=(s,e)=>{bright=!bright;Invalidate();};FormClosed+=(s,e)=>{pulse.Dispose();artwork.Dispose();foreach(var font in scaledFonts.Values)font.Dispose();};RefreshState(false);
             MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(Handle,0xA1,(IntPtr)2,IntPtr.Zero);}};
+        }
+        void Relayout(){
+            if(!layoutReady||ClientSize.Width<1||ClientSize.Height<1)return;
+            float sx=ClientSize.Width/320f,sy=ClientSize.Height/450f;
+            foreach(Control control in Controls){Rectangle b=(Rectangle)control.Tag;control.SetBounds((int)(b.X*sx),(int)(b.Y*sy),(int)(b.Width*sx),(int)(b.Height*sy));
+                Font oldFont;scaledFonts.TryGetValue(control,out oldFont);control.Font=new Font("Microsoft YaHei UI",(control==heading?12:10)*Math.Min(sx,sy),control==heading||control==button?FontStyle.Bold:FontStyle.Regular);scaledFonts[control]=control.Font;if(oldFont!=null)oldFont.Dispose();}
+            // Use the image alpha as the native window shape. Semi-transparent edge
+            // pixels blend against brown rather than a magenta colour key.
+            using(var mask=new Bitmap(ClientSize.Width,Math.Max(1,(int)(280*sy)))){
+                using(var g=Graphics.FromImage(mask))g.DrawImage(artwork,new Rectangle((int)(20*sx),0,(int)(280*sx),(int)(280*sy)));
+                var region=new Region();region.MakeEmpty();
+                for(int y=0;y<mask.Height;y++){int start=-1;for(int x=0;x<=mask.Width;x++){bool opaque=x<mask.Width&&mask.GetPixel(x,y).A>=128;if(opaque&&start<0)start=x;if(!opaque&&start>=0){region.Union(new Rectangle(start,y,x-start,1));start=-1;}}}
+                using(var path=RoundedDrawing.Path(new Rectangle((int)(17*sx),(int)(273*sy),(int)(286*sx),(int)(167*sy)),(int)(18*Math.Min(sx,sy))))region.Union(path);
+                var previous=Region;Region=region;if(previous!=null)previous.Dispose();
+            }Invalidate();
+        }
+        protected override void WndProc(ref Message m){
+            base.WndProc(ref m);
+            if(m.Msg==0x84&&layoutReady){long packed=m.LParam.ToInt64();Point p=PointToClient(new Point((short)(packed&65535),(short)((packed>>16)&65535)));float sx=ClientSize.Width/320f,sy=ClientSize.Height/450f;
+                bool left=p.X<25*sx,right=p.X>295*sx,bottom=p.Y>430*sy,top=p.Y<12*sy;
+                if(p.Y>280*sy||top)m.Result=(IntPtr)(bottom?(left?16:right?17:15):top?(left?13:right?14:12):left?10:right?11:1);
+            }
         }
         [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool ReleaseCapture();
         [System.Runtime.InteropServices.DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr h,int m,IntPtr w,IntPtr l);
@@ -83,19 +107,21 @@ class MoveReminder : Form {
         public void RefreshState(bool active){exercising=active;heading.Text=active?"享受活动的时间":customTitle;message.Text=active?"提醒已暂停，运动结束后再开始。":customBody;message.Select(0,0);button.Text=active?"运动结束，重新计时":"暂停提醒，去运动";if(active)pulse.Stop();else pulse.Start();Invalidate();}
         protected override bool ShowWithoutActivation{get{return true;}}
         protected override void OnPaint(PaintEventArgs e){
-            base.OnPaint(e);var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;g.InterpolationMode=InterpolationMode.HighQualityBicubic;
-            using(var toolbar=new SolidBrush(Color.FromArgb(255,249,236)))g.FillRoundedRectangle(toolbar,new Rectangle(17,4,286,40),12);g.DrawImage(artwork,new Rectangle(20,44,280,280));
-            using(var brush=new SolidBrush(Color.FromArgb(255,249,236)))g.FillRoundedRectangle(brush,new Rectangle(17,313,286,127),18);
-            using(var pen=new Pen(isDue&&!exercising&&bright?Color.FromArgb(88,170,101):Color.FromArgb(221,230,202),3))g.DrawRoundedRectangle(pen,new Rectangle(17,313,286,127),18);
-            using(var font=new Font("Segoe UI",27,FontStyle.Bold))TextRenderer.DrawText(g,TimerValue,font,new Rectangle(55,222,210,50),Color.FromArgb(74,42,40),TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.NoPadding);
+            base.OnPaint(e);var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;g.InterpolationMode=InterpolationMode.HighQualityBicubic;g.ScaleTransform(ClientSize.Width/320f,ClientSize.Height/450f);
+            g.DrawImage(artwork,new Rectangle(20,0,280,280));
+            using(var brush=new SolidBrush(Color.FromArgb(255,249,236)))g.FillRoundedRectangle(brush,new Rectangle(17,273,286,167),18);
+            using(var pen=new Pen(isDue&&!exercising&&bright?Color.FromArgb(88,170,101):Color.FromArgb(221,230,202),3))g.DrawRoundedRectangle(pen,new Rectangle(17,273,286,167),18);
+            g.ResetTransform();float sx=ClientSize.Width/320f,sy=ClientSize.Height/450f;
+            using(var font=new Font("Segoe UI",27*Math.Min(sx,sy),FontStyle.Bold))TextRenderer.DrawText(g,TimerValue,font,new Rectangle((int)(55*sx),(int)(178*sy),(int)(210*sx),(int)(50*sy)),Color.FromArgb(74,42,40),TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.NoPadding);
         }
     }
 }
 static class RoundedDrawing{
-    static GraphicsPath Path(Rectangle r,int radius){var p=new GraphicsPath();int d=radius*2;p.AddArc(r.X,r.Y,d,d,180,90);p.AddArc(r.Right-d,r.Y,d,d,270,90);p.AddArc(r.Right-d,r.Bottom-d,d,d,0,90);p.AddArc(r.X,r.Bottom-d,d,d,90,90);p.CloseFigure();return p;}
+    public static GraphicsPath Path(Rectangle r,int radius){var p=new GraphicsPath();int d=radius*2;p.AddArc(r.X,r.Y,d,d,180,90);p.AddArc(r.Right-d,r.Y,d,d,270,90);p.AddArc(r.Right-d,r.Bottom-d,d,d,0,90);p.AddArc(r.X,r.Bottom-d,d,d,90,90);p.CloseFigure();return p;}
     public static void FillRoundedRectangle(this Graphics g,Brush b,Rectangle r,int radius){using(var p=Path(r,radius))g.FillPath(b,p);}
     public static void DrawRoundedRectangle(this Graphics g,Pen b,Rectangle r,int radius){using(var p=Path(r,radius))g.DrawPath(b,p);}
 }
+
 
 
 
